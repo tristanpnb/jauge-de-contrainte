@@ -9,6 +9,8 @@ arduino = serialport(portSerie, 9600);
 arduino.Timeout = 5;
 % Envoyer le caractère "r" pour activer la boucle loop() de l'Arduino
 write(arduino, "r", "char");
+% Initialiser une matrice pour stocker toutes les données avec l'ID de l'essai
+toutesLesDonnees = [];
 % Boucle pour les essais
 for i = 1:nombreEssais
   
@@ -25,11 +27,17 @@ for i = 1:nombreEssais
        donnees = [donnees; str2double(ligne)];
        ligne = readline(arduino); % Lire la ligne suivante
    end
+   % Créer une matrice temporaire pour l'essai courant
+   donneesEssai = [repmat(i, size(donnees,1), 1) donnees];
+   % Concaténer les données de l'essai courant à la matrice principale
+   toutesLesDonnees = [toutesLesDonnees; donneesEssai];
    % Enregistrer les données avec le nom "Essai i"
    nomFichier = ['Essai ' num2str(i) '.mat'];
    save(nomFichier, 'donnees');
    % Envoyer le signal "stop" à l'Arduino
    writeline(arduino, "stop");
 end
+% Enregistrer toutes les données dans un fichier
+save('ToutesLesDonnees.mat', 'toutesLesDonnees');
 % Fermer la connexion
 clear arduino;
