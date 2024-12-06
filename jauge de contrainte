@@ -1,43 +1,95 @@
 code matlab : 
 
-% Paramètres
-nombreEssais = 10;
-portSerie = 'COM3'; % Remplacez par le port série de votre Arduino
-% Connexion à l'Arduino
-arduino = serialport(portSerie, 9600);
-% Augmenter le timeout (facultatif, si nécessaire)
-arduino.Timeout = 5;
-% Envoyer le caractère "r" pour activer la boucle loop() de l'Arduino
-write(arduino, "r", "char");
-% Initialiser une matrice pour stocker toutes les données avec l'ID de l'essai
-toutesLesDonnees = [];
-% Boucle pour les essais
-for i = 1:nombreEssais
-  
-   % Envoyer le signal de déclenchement à l'Arduino
-   writeline(arduino, "Demarrer acquisition");
-   % Attendre le début de l'essai
-   ligne = readline(arduino); % Lire la ligne "Debut Essai i"
-   disp(ligne);
-   % Démarrer l'acquisition
-   donnees = [];
-   ligne = readline(arduino); % Lire la première ligne de données
-   while ~contains(string(ligne), "Fin Essai")
-       ligne = strtrim(ligne);
-       donnees = [donnees; str2double(ligne)];
-       ligne = readline(arduino); % Lire la ligne suivante
+function JaugeDeContrainte()
+   % Paramètres par défaut
+   nombreEssais = 10;
+   dureeAcquisition = 10; % en secondes
+   % Créer la figure de l'IHM
+   fig = uifigure('Name', 'Paramètres d''acquisition');
+   fig.Position = [100 100 400 350]; % Augmenter la hauteur de la figure
+   % Couleur de fond gris clair
+   fig.Color = [0.94 0.94 0.94];
+   % Ajouter une image de fond (remplacez par le chemin réel)
+   img = uiimage(fig, 'ImageSource', 'C:\Users\antoi\Documents\M2\GITLAB\Paramètre.jpg');
+   img.Position = [0 250 fig.Position(3) 100]; % Ajuster la position et la taille
+   % Titre "Paramètres d'acquisition"
+   lblTitre = uilabel(fig, 'Text', 'Paramètres d''acquisition', ...
+                      'FontSize', 18, 'FontWeight', 'bold', ...
+                      'HorizontalAlignment', 'center');
+   lblTitre.Position = [0 220 fig.Position(3) 30];
+   % Créer les éléments de l'IHM
+   lblNombreEssais = uilabel(fig, 'Text', 'Nombre d''essais :', ...
+                             'FontSize', 14, 'FontWeight', 'bold');
+   lblNombreEssais.Position = [50 200 150 22];
+   txtNombreEssais = uieditfield(fig, 'numeric', 'Value', nombreEssais, ...
+                                'FontSize', 14);
+   txtNombreEssais.Position = [220 200 100 22];
+   lblDureeAcquisition = uilabel(fig, 'Text', 'Durée d''acquisition (s) :', ...
+                                  'FontSize', 14, 'FontWeight', 'bold');
+   lblDureeAcquisition.Position = [50 150 180 22];
+   txtDureeAcquisition = uieditfield(fig, 'numeric', 'Value', dureeAcquisition, ...
+                                    'FontSize', 14);
+   txtDureeAcquisition.Position = [220 150 100 22];
+   % Bouton avec texte stylisé
+   btnDemarrer = uibutton(fig, 'push', 'Text', 'Démarrer l''acquisition', ...
+                        'FontSize', 16, 'FontWeight', 'bold', ...
+                        'BackgroundColor', [0.4660 0.6740 0.1880], ... % Vert
+                        'ButtonPushedFcn', @demarrerAcquisition);
+   btnDemarrer.Position = [100 80 200 40];
+   % Fonction de rappel pour le bouton "Démarrer"
+   function demarrerAcquisition(~, ~)
+       % Récupérer les valeurs des champs de l'IHM
+       nombreEssais = txtNombreEssais.Value;
+       dureeAcquisition = txtDureeAcquisition.Value * 1000; % Convertir en millisecondes
+       disp(['Duree d''acquisition (ms): ' num2str(dureeAcquisition)]); % Afficher la valeur
+       % Fermer la figure de l'IHM
+       close(fig);
+       % Appeler la fonction d'acquisition avec les paramètres
+       lancerAcquisition(nombreEssais, dureeAcquisition);
    end
-   % Créer une matrice temporaire pour l'essai courant
-   donneesEssai = [repmat(i, size(donnees,1), 1) donnees];
-   % Concaténer les données de l'essai courant à la matrice principale
-   toutesLesDonnees = [toutesLesDonnees; donneesEssai];
-   % Enregistrer les données avec le nom "Essai i"
-   nomFichier = ['Essai ' num2str(i) '.mat'];
-   save(nomFichier, 'donnees');
-   % Envoyer le signal "stop" à l'Arduino
-   writeline(arduino, "stop");
 end
-% Enregistrer toutes les données dans un fichier
-save('ToutesLesDonnees.mat', 'toutesLesDonnees');
-% Fermer la connexion
-clear arduino;
+function lancerAcquisition(nombreEssais, dureeAcquisition)
+   % Fonction d'acquisition avec les paramètres spécifiés
+   portSerie = 'COM3'; % Remplacez par le port série de votre Arduino
+   % Connexion à l'Arduino
+   arduino = serialport(portSerie, 9600);
+   % Augmenter le timeout (facultatif, si nécessaire)
+   arduino.Timeout = 5;
+   % Envoyer le caractère "r" pour activer la boucle loop() de l'Arduino
+   write(arduino, "r", "char");
+   % Initialiser une matrice pour stocker toutes les données avec l'ID de l'essai
+   toutesLesDonnees = [];
+   % Boucle pour les essais
+   for i = 1:nombreEssais
+       % Envoyer la durée d'acquisition à l'Arduino
+       writeline(arduino, ['duree ' num2str(dureeAcquisition)]);
+       disp(['Commande envoyee: duree ' num2str(dureeAcquisition)]); % Afficher la commande
+       pause(0.1); % Petite pause pour la synchronisation
+       % Envoyer le signal de déclenchement à l'Arduino
+       writeline(arduino, "Demarrer acquisition");
+       % Attendre le début de l'essai
+       ligne = readline(arduino); % Lire la ligne "Debut Essai i"
+       disp(ligne);
+       % Démarrer l'acquisition
+       donnees = [];
+       ligne = readline(arduino); % Lire la première ligne de données
+       while ~contains(string(ligne), "Fin Essai")
+           ligne = strtrim(ligne);
+           donnees = [donnees; str2double(ligne)];
+           ligne = readline(arduino); % Lire la ligne suivante
+       end
+       % Créer une matrice temporaire pour l'essai courant
+       donneesEssai = [repmat(i, size(donnees,1), 1) donnees];
+       % Concaténer les données de l'essai courant à la matrice principale
+       toutesLesDonnees = [toutesLesDonnees; donneesEssai];
+       % Enregistrer les données avec le nom "Essai i"
+       nomFichier = ['Essai ' num2str(i) '.mat'];
+       save(nomFichier, 'donnees');
+       % Envoyer le signal "stop" à l'Arduino
+       writeline(arduino, "stop");
+   end
+   % Enregistrer toutes les données dans un fichier
+   save('ToutesLesDonnees.mat', 'toutesLesDonnees');
+   % Fermer la connexion
+   clear arduino;
+end
