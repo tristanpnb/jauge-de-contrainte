@@ -1,24 +1,66 @@
 code arduino : 
 
 const int jaugePin = A0; // Broche analogique connectée à la jauge de contrainte
-const int dureeAcquisition = 10000; // Durée d'acquisition en millisecondes (10 secondes)
 const int nombreEssais = 10;
 int essaiCourant = 1;
 bool demarrerAcquisition = false; // Variable pour contrôler le démarrage de la boucle loop()
-
+unsigned long dureeAcquisition = 10000; // Durée d'acquisition en millisecondes (10 secondes)
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
+  digitalWrite(LED_BUILTIN, LOW); 
   Serial.begin(9600); // Initialise la communication série
 
-
   // Attendre la réception du caractère "r"
-  while (Serial.available() == 0) {} // Attendre que des données soient disponibles
-  if (Serial.read() == 'r') {
-    demarrerAcquisition = true;  // Autoriser l'exécution de la boucle loop()
-    digitalWrite(LED_BUILTIN, HIGH); // Allumer la LED pour indiquer que l'acquisition est prête
+  while (Serial.available() == 0) {} 
+  if (Serial.read() == 'r') { 
+    demarrerAcquisition = true;  
+    digitalWrite(LED_BUILTIN, HIGH); 
   }
 }
 
+void loop() {
+  if (demarrerAcquisition && essaiCourant <= nombreEssais) {
+    
+    // Lire la durée d'acquisition
+    while (Serial.available() == 0) {} 
+    String signal = Serial.readStringUntil('\n');
+    if (signal.startsWith("duree ")) {
+      dureeAcquisition = signal.substring(5).toInt();
+      Serial.print("Duree d'acquisition recue : ");
+      Serial.println(dureeAcquisition); // Afficher la valeur lue
 
+      if (dureeAcquisition == 0) {
+        Serial.println("Erreur : Duree d'acquisition invalide.");
+        // Gérer l'erreur (par exemple, utiliser une valeur par défaut)
+        dureeAcquisition = 10000; 
+      }
+
+      delay(100); // Délai pour traiter la nouvelle valeur
+    }
+
+    // Attendre le signal de déclenchement de Matlab
+    signal = Serial.readStringUntil('\n');
+    if (signal == "Demarrer acquisition") {
+
+      Serial.print("Debut Essai ");
+      Serial.println(essaiCourant);
+
+      // Acquisition des données pendant la durée spécifiée
+      unsigned long debutEssai = millis();
+      while (millis() - debutEssai < dureeAcquisition) {
+        int valeurJauge = analogRead(jaugePin);
+        Serial.print(valeurJauge); 
+        Serial.print("\n");
+        delay(100); 
+      }
+
+      Serial.println("Fin Essai");
+      essaiCourant++;
+
+    } else if (signal == "stop") {
+      // Revenir au début de la boucle loop()
+      return; 
+    }
+  }
+}
