@@ -5,62 +5,79 @@ const int nombreEssais = 10;
 int essaiCourant = 1;
 bool demarrerAcquisition = false; // Variable pour contrôler le démarrage de la boucle loop()
 unsigned long dureeAcquisition = 10000; // Durée d'acquisition en millisecondes (10 secondes)
+unsigned long firstTimeValue = 0;
+bool firstTime = true;
+unsigned long time = 0;
+
+
+
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW); 
-  Serial.begin(9600); // Initialise la communication série
+  digitalWrite(LED_BUILTIN, LOW);
+  Serial.begin(9800); // Initialise la communication série
+  Serial.flush();
+
 
   // Attendre la réception du caractère "r"
-  while (Serial.available() == 0) {} 
-  if (Serial.read() == 'r') { 
-    demarrerAcquisition = true;  
-    digitalWrite(LED_BUILTIN, HIGH); 
+  while (!demarrerAcquisition) {
+    if (Serial.available()) {
+      demarrerAcquisition = ((char)Serial.read()) == 'r';
+    }
   }
+  digitalWrite(LED_BUILTIN, HIGH);
 }
+
 
 void loop() {
   if (demarrerAcquisition && essaiCourant <= nombreEssais) {
-    
+
+
     // Lire la durée d'acquisition
-    while (Serial.available() == 0) {} 
-    String signal = Serial.readStringUntil('\n');
-    if (signal.startsWith("duree ")) {
-      dureeAcquisition = signal.substring(5).toInt();
-      Serial.print("Duree d'acquisition recue : ");
-      Serial.println(dureeAcquisition); // Afficher la valeur lue
+    if (Serial.available()) {
+      String signal = Serial.readStringUntil('\n');
+      if (signal.startsWith("duree ")) {
+        dureeAcquisition = signal.substring(5).toInt();
+        Serial.print("Duree d'acquisition recue : ");
+        Serial.println(dureeAcquisition); // Afficher la valeur lue
 
-      if (dureeAcquisition == 0) {
-        Serial.println("Erreur : Duree d'acquisition invalide.");
-        // Gérer l'erreur (par exemple, utiliser une valeur par défaut)
-        dureeAcquisition = 10000; 
+
+        if (dureeAcquisition == 0) {
+          Serial.println("Erreur : Duree d'acquisition invalide.");
+          // Gérer l'erreur (par exemple, utiliser une valeur par défaut)
+          dureeAcquisition = 10000;
+        }
       }
-
-      delay(100); // Délai pour traiter la nouvelle valeur
     }
 
-    // Attendre le signal de déclenchement de Matlab
-    signal = Serial.readStringUntil('\n');
-    if (signal == "Demarrer acquisition") {
 
-      Serial.print("Debut Essai ");
-      Serial.println(essaiCourant);
+    if (firstTime) {
+      firstTime = false;
+      firstTimeValue = millis();
+      time = 0;
+    } else {
+      time = millis() - firstTimeValue;
+    }
 
-      // Acquisition des données pendant la durée spécifiée
-      unsigned long debutEssai = millis();
-      while (millis() - debutEssai < dureeAcquisition) {
-        int valeurJauge = analogRead(jaugePin);
-        Serial.print(valeurJauge); 
-        Serial.print("\n");
-        delay(100); 
-      }
 
+    if (time <= dureeAcquisition) {
+      int valeurJauge = analogRead(jaugePin);
+      Serial.println(valeurJauge);
+      Serial.flush();
+      delay(100);
+    } else {
       Serial.println("Fin Essai");
       essaiCourant++;
+      firstTime = true; // Réinitialiser pour le prochain essai
 
-    } else if (signal == "stop") {
-      // Revenir au début de la boucle loop()
-      return; 
+
+      // Attendre le signal "stop" de Matlab
+      while (Serial.available() == 0) {}
+      if (Serial.read() == 's') {
+        // Réinitialiser pour le prochain essai
+        return;
+      }
     }
   }
 }
+
